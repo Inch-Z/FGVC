@@ -56,7 +56,7 @@ class PMGI(nn.Module):
             nn.Linear(feature_size, classes_num),
         )
 
-        self.map1 = nn.Linear(feature_size * 3, feature_size)
+        self.map1 = nn.Linear((self.num_ftrs // 2) * 3, feature_size)
         self.map2 = nn.Linear(feature_size, feature_size)
         self.fc = nn.Linear(feature_size, 200)
         self.drop = nn.Dropout(p=0.5)
