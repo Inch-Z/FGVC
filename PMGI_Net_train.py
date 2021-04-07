@@ -7,7 +7,7 @@ import time
 from models.backbone import resnet_for_pmg
 from models.classification_network.PMGI_Net import PMGI
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1, 2, 3'
 
 
 class Net(nn.Module):
@@ -15,10 +15,10 @@ class Net(nn.Module):
         super(Net, self).__init__()
         # 选择resnet 除最后一层的全连接，改为CLASS输出
         self.model = nn.Sequential(*list(model.children())[:-1])
-        self.pmgi = PMGI(model, feature_size=512, classes_num=CLASS)
+        self.pmg = PMGI(model, feature_size=512, classes_num=CLASS)
 
     def forward(self, x, train_flag='train'):
-        x1, x2, x3, x_concat= self.pmgi(x, train_flag)
+        x1, x2, x3, x_concat= self.pmg(x, train_flag)
         return x1, x2, x3, x_concat
 
 
@@ -397,7 +397,7 @@ def _CUB200():
     print("cuda:2")
     device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
     model = Net(resnet_for_pmg.resnet50(pretrained=True), class_num)
-    device_ids = [0]
+    device_ids = [0, 1, 2 ,3]
     model = nn.DataParallel(model, device_ids=device_ids).cuda(0)
     model.to(f'cuda:{model.device_ids[0]}')
     criterion = torch.nn.CrossEntropyLoss()
