@@ -2,9 +2,9 @@ import torch.nn as nn
 import torch
 
 
-class PMGI_V2(nn.Module):
+class PMGI_V3_Extend(nn.Module):
     def __init__(self, model, feature_size, classes_num):
-        super(PMGI_V2, self).__init__()
+        super(PMGI_V3_Extend, self).__init__()
 
         self.features = model
         self.maxpool = nn.AdaptiveMaxPool2d((1, 1))
@@ -81,37 +81,43 @@ class PMGI_V2(nn.Module):
 
         x_concat = torch.cat((xl1, xl2, xl3), -1)
 
+        if train_flag == "train":
+            # API-Part
+            feas = self.map1(x_concat)
+            feas = self.drop(feas)
+            feas = self.map2(feas)
 
-        # API-Part
-        feas = self.map1(x_concat)
-        feas = self.drop(feas)
-        feas = self.map2(feas)
+            gate1 = torch.mul(feas, xl1)
+            gate1 = self.sigmoid(gate1)
+            gate2 = torch.mul(feas, xl2)
+            gate2 = self.sigmoid(gate2)
+            gate3 = torch.mul(feas, xl3)
+            gate3 = self.sigmoid(gate3)
 
-        gate1 = torch.mul(feas, xl1)
-        gate1 = self.sigmoid(gate1)
-        gate2 = torch.mul(feas, xl2)
-        gate2 = self.sigmoid(gate2)
-        gate3 = torch.mul(feas, xl3)
-        gate3 = self.sigmoid(gate3)
-
-        x1 = torch.mul(gate1, xl1) + xl1
-        x2 = torch.mul(gate2, xl2) + xl2
-        x3 = torch.mul(gate3, xl3) + xl3
+            x1 = torch.mul(gate1, xl1) + xl1
+            x2 = torch.mul(gate2, xl2) + xl2
+            x3 = torch.mul(gate3, xl3) + xl3
 
 
-        xc1 = self.classifier1(x1)
-        xc2 = self.classifier2(x2)
-        xc3 = self.classifier3(x3)
-        # or
-        # xc1 = self.classifier1(x1)
-        # xc2 = self.classifier1(x2)
-        # xc3 = self.classifier1(x3)
-        # or
-        # xc1 = self.fc(x1)
-        # xc2 = self.fc(x2)
-        # xc3 = self.fc(x3)
+            xc1 = self.classifier1(x1)
+            xc2 = self.classifier2(x2)
+            xc3 = self.classifier3(x3)
+            # or
+            # xc1 = self.classifier1(x1)
+            # xc2 = self.classifier1(x2)
+            # xc3 = self.classifier1(x3)
+            # or
+            # xc1 = self.fc(x1)
+            # xc2 = self.fc(x2)
+            # xc3 = self.fc(x3)
 
-        return xc1, xc2, xc3
+            features = torch.cat([x1, x2, x3], dim=1)
+            x_concat = self.classifier_concat(features)
+
+        if train_flag == "val":
+            x_concat = self.classifier_concat(x_concat)
+
+        return xc1, xc2, xc3, x_concat
 
 
 class BasicConv(nn.Module):

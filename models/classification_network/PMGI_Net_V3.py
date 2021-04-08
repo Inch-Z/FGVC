@@ -2,9 +2,9 @@ import torch.nn as nn
 import torch
 
 
-class PMGI_V2(nn.Module):
+class PMGI_V3(nn.Module):
     def __init__(self, model, feature_size, classes_num):
-        super(PMGI_V2, self).__init__()
+        super(PMGI_V3, self).__init__()
 
         self.features = model
         self.maxpool = nn.AdaptiveMaxPool2d((1, 1))
@@ -111,7 +111,10 @@ class PMGI_V2(nn.Module):
         # xc2 = self.fc(x2)
         # xc3 = self.fc(x3)
 
-        return xc1, xc2, xc3
+        features = torch.cat([x1, x2, x3], dim=1)
+        x_concat = self.classifier_concat(features)
+
+        return xc1, xc2, xc3, x_concat
 
 
 class BasicConv(nn.Module):
