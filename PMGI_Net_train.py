@@ -6,6 +6,9 @@ from utils import saveModel, loadModel, chooseData, writeHistory, writeLog, jigs
 import time
 from models.backbone import resnet_for_pmg
 from models.classification_network.PMGI_Net import PMGI
+from models.classification_network.PMGI_Net_Extend import PMGI_Extend
+from models.classification_network.PMGI_Net_V3 import PMGI_V3
+from models.classification_network.PMGI_Net_V3_Extend import PMGI_V3_Extend
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1, 2, 3'
 
@@ -15,7 +18,14 @@ class Net(nn.Module):
         super(Net, self).__init__()
         # 选择resnet 除最后一层的全连接，改为CLASS输出
         self.model = nn.Sequential(*list(model.children())[:-1])
+        # PMGI
         self.pmg = PMGI(model, feature_size=512, classes_num=CLASS)
+        # PMGI_Extend
+        # self.pmg = PMGI_Extend(model, feature_size=512, classes_num=CLASS)
+        # PMGI_V3
+        # self.pmg = PMGI_V3(model, feature_size=512, classes_num=CLASS)
+        # PMGI_V3_Extend
+        # self.pmg = PMGI_V3_Extend(model, feature_size=512, classes_num=CLASS)
 
     def forward(self, x, train_flag='train'):
         x1, x2, x3, x_concat= self.pmg(x, train_flag)
