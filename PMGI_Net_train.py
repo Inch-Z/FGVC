@@ -192,7 +192,7 @@ def oneEpoch_train(model, dataLoader, optimzer, criterion, device):
         # step 1
         optimzer.zero_grad()
         inputs1 = jigsaw_generator(inputs, 8)
-        output_1, _, _, _ = model(inputs1, train_flag="train")
+        output_1, _, _, _ = model(x=inputs1, train_flag="train")
         _loss_1 = criterion(output_1, labels)
         _loss_1.backward()
         optimzer.step()
@@ -200,7 +200,7 @@ def oneEpoch_train(model, dataLoader, optimzer, criterion, device):
         # step 2
         optimzer.zero_grad()
         inputs2 = jigsaw_generator(inputs, 4)
-        _, output_2, _, _ = model(inputs2, train_flag="train")
+        _, output_2, _, _ = model(x=inputs2, train_flag="train")
         _loss_2 = criterion(output_2, labels)
         _loss_2.backward()
         optimzer.step()
@@ -208,14 +208,14 @@ def oneEpoch_train(model, dataLoader, optimzer, criterion, device):
         # step 3
         optimzer.zero_grad()
         inputs3 = jigsaw_generator(inputs, 2)
-        _, _, output_3, _ = model(inputs3, train_flag="train")
+        _, _, output_3, _ = model(x=inputs3, train_flag="train")
         _loss_3 = criterion(output_3, labels)
         _loss_3.backward()
         optimzer.step()
 
         # step 4
         optimzer.zero_grad()
-        _, _, _, output_4 = model(inputs, train_flag="train")
+        _, _, _, output_4 = model(x=inputs, train_flag="train")
         _loss_concat = criterion(output_4, labels) * 2
         _loss_concat.backward()
         optimzer.step()
@@ -264,7 +264,7 @@ def oneEpoch_valid(model, dataLoader, criterion, device):
             inputs, labels = inputs.to(f'cuda:{model.device_ids[0]}'), labels.to(f'cuda:{model.device_ids[0]}')
             inputs, labels = Variable(inputs), Variable(labels)
 
-            outputs1, outputs2, outputs3, outputs_concat = model(inputs, train_flag="val")
+            outputs1, outputs2, outputs3, outputs_concat = model(x=inputs, train_flag="val")
 
             outputs_com = outputs1 + outputs2 + outputs3 + outputs_concat
 
