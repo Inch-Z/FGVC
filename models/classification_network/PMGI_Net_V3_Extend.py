@@ -115,6 +115,9 @@ class PMGI_V3_Extend(nn.Module):
             x_concat = self.classifier_concat(features)
 
         if train_flag == "val":
+            xc1 = self.classifier1(xl1)
+            xc2 = self.classifier2(xl2)
+            xc3 = self.classifier3(xl3)
             x_concat = self.classifier_concat(x_concat)
 
         return xc1, xc2, xc3, x_concat
