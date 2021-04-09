@@ -19,13 +19,13 @@ class Net(nn.Module):
         # 选择resnet 除最后一层的全连接，改为CLASS输出
         self.model = nn.Sequential(*list(model.children())[:-1])
         # PMGI
-        self.pmg = PMGI(model, feature_size=512, classes_num=CLASS)
+        # self.pmg = PMGI(model, feature_size=512, classes_num=CLASS)
         # PMGI_Extend
         # self.pmg = PMGI_Extend(model, feature_size=512, classes_num=CLASS)
         # PMGI_V3
         # self.pmg = PMGI_V3(model, feature_size=512, classes_num=CLASS)
         # PMGI_V3_Extend
-        # self.pmg = PMGI_V3_Extend(model, feature_size=512, classes_num=CLASS)
+        self.pmg = PMGI_V3_Extend(model, feature_size=512, classes_num=CLASS)
 
     def forward(self, x, train_flag='train'):
         x1, x2, x3, x_concat= self.pmg(x, train_flag)
@@ -404,7 +404,7 @@ def _CUB200():
     # 定义模型 定义评价 优化器等
     lr = 1e-4
     class_num = 200
-    print("cuda:2")
+    print("cuda:0,1,2,3")
     device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
     model = Net(resnet_for_pmg.resnet50(pretrained=True), class_num)
     device_ids = [0, 1, 2 ,3]
@@ -430,7 +430,7 @@ def _CUB200():
     # torch.optim.lr_scheduler.StepLR(optimzer, 10, gamma=0.94, last_epoch=-1)
     torch.optim.lr_scheduler.CosineAnnealingLR(optimzer, T_max=10)
     epochs = 200
-    batchSize = 15
+    batchSize = 64
     worker = 2
     modelConfig = {
         'model': model,
