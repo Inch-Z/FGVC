@@ -23,9 +23,9 @@ class Net(nn.Module):
         # PMGI_Extend
         # self.pmg = PMGI_Extend(model, feature_size=512, classes_num=CLASS)
         # PMGI_V3
-        # self.pmg = PMGI_V3(model, feature_size=512, classes_num=CLASS)
+        self.pmg = PMGI_V3(model, feature_size=512, classes_num=CLASS)
         # PMGI_V3_Extend
-        self.pmg = PMGI_V3_Extend(model, feature_size=512, classes_num=CLASS)
+        # self.pmg = PMGI_V3_Extend(model, feature_size=512, classes_num=CLASS)
 
     def forward(self, x, train_flag='train'):
         x1, x2, x3, x_concat= self.pmg(x, train_flag)
@@ -201,24 +201,24 @@ def oneEpoch_train(model, dataLoader, optimzer, criterion, device):
         # 梯度设为零，求前向传播的值
         # step 1
         optimzer.zero_grad()
-        inputs1 = jigsaw_generator(inputs, 8)
-        output_1, _, _, _ = model(x=inputs1, train_flag="train")
+        # inputs1 = jigsaw_generator(inputs, 8)
+        output_1, _, _, _ = model(x=inputs, train_flag="train")
         _loss_1 = criterion(output_1, labels)
         _loss_1.backward()
         optimzer.step()
 
         # step 2
         optimzer.zero_grad()
-        inputs2 = jigsaw_generator(inputs, 4)
-        _, output_2, _, _ = model(x=inputs2, train_flag="train")
+        # inputs2 = jigsaw_generator(inputs, 4)
+        _, output_2, _, _ = model(x=inputs, train_flag="train")
         _loss_2 = criterion(output_2, labels)
         _loss_2.backward()
         optimzer.step()
 
         # step 3
         optimzer.zero_grad()
-        inputs3 = jigsaw_generator(inputs, 2)
-        _, _, output_3, _ = model(x=inputs3, train_flag="train")
+        # inputs3 = jigsaw_generator(inputs, 2)
+        _, _, output_3, _ = model(x=inputs, train_flag="train")
         _loss_3 = criterion(output_3, labels)
         _loss_3.backward()
         optimzer.step()
