@@ -17,9 +17,9 @@ class Net(nn.Module):
         # 选择resnet 除最后一层的全连接，改为CLASS输出
         self.model = nn.Sequential(*list(model.children())[:-1])
         # PMGI_V2
-        self.pmg = PMGI_V2(model, feature_size=512, classes_num=CLASS)
+        # self.pmg = PMGI_V2(model, feature_size=512, classes_num=CLASS)
         # PMGI_V2_Extend
-        # self.pmg = PMGI_V2_Extend(model, feature_size=512, classes_num=CLASS)
+        self.pmg = PMGI_V2_Extend(model, feature_size=512, classes_num=CLASS)
 
     def forward(self, x, train_flag='train'):
         x1, x2, x3 = self.pmg(x, train_flag)
