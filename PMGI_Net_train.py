@@ -404,6 +404,8 @@ def _CUB200():
     # 定义模型 定义评价 优化器等
     lr = 1e-4
     class_num = 200
+    torch.manual_seed(0)
+    torch.cuda.manual_seed_all(0)
     print("cuda:0,1,2,3")
     device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
     model = Net(resnet_for_pmg.resnet50(pretrained=True), class_num)

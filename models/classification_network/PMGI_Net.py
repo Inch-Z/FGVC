@@ -83,26 +83,26 @@ class PMGI(nn.Module):
 
         x_concat = torch.cat((xl1, xl2, xl3), -1)
 
-        # x_concat = self.classifier_concat(x_concat)
+        x_concat = self.classifier_concat(x_concat)
 
         # API-Part
-        feas = self.map1(x_concat)
-        feas = self.drop(feas)
-        feas = self.map2(feas)
-
-        gate1 = torch.mul(feas, xl1)
-        gate1 = self.sigmoid(gate1)
-        gate2 = torch.mul(feas, xl2)
-        gate2 = self.sigmoid(gate2)
-        gate3 = torch.mul(feas, xl3)
-        gate3 = self.sigmoid(gate3)
-
-        x1 = torch.mul(gate1, xl1) + xl1
-        x2 = torch.mul(gate2, xl2) + xl2
-        x3 = torch.mul(gate3, xl3) + xl3
-
-        features = torch.cat([x1, x2, x3], dim=1)
-        x_concat = self.classifier_concat(features)
+        # feas = self.map1(x_concat)
+        # feas = self.drop(feas)
+        # feas = self.map2(feas)
+        #
+        # gate1 = torch.mul(feas, xl1)
+        # gate1 = self.sigmoid(gate1)
+        # gate2 = torch.mul(feas, xl2)
+        # gate2 = self.sigmoid(gate2)
+        # gate3 = torch.mul(feas, xl3)
+        # gate3 = self.sigmoid(gate3)
+        #
+        # x1 = torch.mul(gate1, xl1) + xl1
+        # x2 = torch.mul(gate2, xl2) + xl2
+        # x3 = torch.mul(gate3, xl3) + xl3
+        #
+        # features = torch.cat([x1, x2, x3], dim=1)
+        # x_concat = self.classifier_concat(features)
 
         return xc1, xc2, xc3, x_concat
 
