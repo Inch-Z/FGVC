@@ -9,6 +9,7 @@ from models.classification_network.PMGI_Net import PMGI
 from models.classification_network.PMGI_Net_Extend import PMGI_Extend
 from models.classification_network.PMGI_Net_V3 import PMGI_V3
 from models.classification_network.PMGI_Net_V3_Extend import PMGI_V3_Extend
+from models.classification_network.PMGI_Net_V4 import PMGI_V4
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1, 2, 3'
 
@@ -19,13 +20,15 @@ class Net(nn.Module):
         # 选择resnet 除最后一层的全连接，改为CLASS输出
         self.model = nn.Sequential(*list(model.children())[:-1])
         # PMGI
-        self.pmg = PMGI(model, feature_size=512, classes_num=CLASS)
+        # self.pmg = PMGI(model, feature_size=512, classes_num=CLASS)
         # PMGI_Extend
         # self.pmg = PMGI_Extend(model, feature_size=512, classes_num=CLASS)
         # PMGI_V3
         # self.pmg = PMGI_V3(model, feature_size=512, classes_num=CLASS)
         # PMGI_V3_Extend
         # self.pmg = PMGI_V3_Extend(model, feature_size=512, classes_num=CLASS)
+        # PMGI_V4
+        self.pmg = PMGI_V4(model, feature_size=512, classes_num=CLASS)
 
     def forward(self, x, train_flag='train'):
         x1, x2, x3, x_concat= self.pmg(x, train_flag)
@@ -147,7 +150,7 @@ def train(modelConfig, dataConfig, logConfig):
         best_L3_log = now + ' best L3 Acc is {:.4f}%\n'.format(100 * best_L3_Acc)
         best_concat_log = now + ' best concat Acc is {:.4f}%\n'.format(100 * best_concat_Acc)
         best_com_log = now + ' best com Acc is {:.4f}%\n'.format(100 * best_com_Acc)
-        best_epoch_log = now + ' best Acc epoch is :' + str(best_epoch) + "\n"
+        best_epoch_log = now + ' best Acc epoch is :' + str(best_epoch) + "\n\n"
 
         train_log = train_L1_Log + train_L2_Log + train_L3_Log + train_concat_Log + train_total_Log
         val_log = val_L1_log + val_L2_log + val_L3_log + val_concat_log + val_com_log
@@ -164,7 +167,7 @@ def train(modelConfig, dataConfig, logConfig):
         #     'validAcces':validAcces
         # }
 
-        writeLog(logPath, best_log)
+        writeLog(logPath, train_log + val_log + best_log)
         # writeHistory(historyPath,history)
 
         # 保存最新一次模型
@@ -432,7 +435,7 @@ def _CUB200():
     # torch.optim.lr_scheduler.StepLR(optimzer, 10, gamma=0.94, last_epoch=-1)
     torch.optim.lr_scheduler.CosineAnnealingLR(optimzer, T_max=10)
     epochs = 200
-    batchSize = 48
+    batchSize = 64
     worker = 4
     modelConfig = {
         'model': model,

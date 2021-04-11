@@ -58,6 +58,7 @@ class PMGI_V4(nn.Module):
 
         self.map1 = nn.Linear((self.num_ftrs // 2) * 3, feature_size)
         self.map2 = nn.Linear(feature_size, (self.num_ftrs // 2))
+        self.fc = nn.Linear(self.num_ftrs // 2, classes_num)
         self.drop = nn.Dropout(p=0.5)
         self.sigmoid = nn.Sigmoid()
 
@@ -95,8 +96,8 @@ class PMGI_V4(nn.Module):
 
         # PMG-Part
         xc1 = self.classifier1(x_branch_1)
-        xc2 = self.classifier1(x_branch_2)
-        xc3 = self.classifier1(x_branch_3)
+        xc2 = self.classifier2(x_branch_2)
+        xc3 = self.classifier3(x_branch_3)
         x_concat = self.classifier_concat(x_concat)
 
         return xc1, xc2, xc3, x_concat
