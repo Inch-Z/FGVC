@@ -9,6 +9,7 @@ from models.classification_network.PMGI_Net import PMGI
 from models.classification_network.PMGI_Net_Extend import PMGI_Extend
 from models.classification_network.PMGI_Net_V3 import PMGI_V3
 from models.classification_network.PMGI_Net_V3_Extend import PMGI_V3_Extend
+from models.classification_network.PMGI_Net_V4 import PMGI_V4
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1, 2, 3'
 
@@ -23,9 +24,11 @@ class Net(nn.Module):
         # PMGI_Extend
         # self.pmg = PMGI_Extend(model, feature_size=512, classes_num=CLASS)
         # PMGI_V3
-        self.pmg = PMGI_V3(model, feature_size=512, classes_num=CLASS)
+        # self.pmg = PMGI_V3(model, feature_size=512, classes_num=CLASS)
         # PMGI_V3_Extend
         # self.pmg = PMGI_V3_Extend(model, feature_size=512, classes_num=CLASS)
+        # PMGI_V4
+        self.pmg = PMGI_V4(model, feature_size=512, classes_num=CLASS)
 
     def forward(self, x, train_flag='train'):
         x1, x2, x3, x_concat= self.pmg(x, train_flag)
@@ -147,7 +150,7 @@ def train(modelConfig, dataConfig, logConfig):
         best_L3_log = now + ' best L3 Acc is {:.4f}%\n'.format(100 * best_L3_Acc)
         best_concat_log = now + ' best concat Acc is {:.4f}%\n'.format(100 * best_concat_Acc)
         best_com_log = now + ' best com Acc is {:.4f}%\n'.format(100 * best_com_Acc)
-        best_epoch_log = now + ' best Acc epoch is :' + str(best_epoch) + "\n"
+        best_epoch_log = now + ' best Acc epoch is :' + str(best_epoch) + "\n\n"
 
         train_log = train_L1_Log + train_L2_Log + train_L3_Log + train_concat_Log + train_total_Log
         val_log = val_L1_log + val_L2_log + val_L3_log + val_concat_log + val_com_log
@@ -164,7 +167,7 @@ def train(modelConfig, dataConfig, logConfig):
         #     'validAcces':validAcces
         # }
 
-        writeLog(logPath, best_log)
+        writeLog(logPath, train_log + val_log + best_log)
         # writeHistory(historyPath,history)
 
         # 保存最新一次模型
@@ -201,24 +204,24 @@ def oneEpoch_train(model, dataLoader, optimzer, criterion, device):
         # 梯度设为零，求前向传播的值
         # step 1
         optimzer.zero_grad()
-        # inputs1 = jigsaw_generator(inputs, 8)
-        output_1, _, _, _ = model(x=inputs, train_flag="train")
+        inputs1 = jigsaw_generator(inputs, 8)
+        output_1, _, _, _ = model(x=inputs1, train_flag="train")
         _loss_1 = criterion(output_1, labels)
         _loss_1.backward()
         optimzer.step()
 
         # step 2
         optimzer.zero_grad()
-        # inputs2 = jigsaw_generator(inputs, 4)
-        _, output_2, _, _ = model(x=inputs, train_flag="train")
+        inputs2 = jigsaw_generator(inputs, 4)
+        _, output_2, _, _ = model(x=inputs2, train_flag="train")
         _loss_2 = criterion(output_2, labels)
         _loss_2.backward()
         optimzer.step()
 
         # step 3
         optimzer.zero_grad()
-        # inputs3 = jigsaw_generator(inputs, 2)
-        _, _, output_3, _ = model(x=inputs, train_flag="train")
+        inputs3 = jigsaw_generator(inputs, 2)
+        _, _, output_3, _ = model(x=inputs3, train_flag="train")
         _loss_3 = criterion(output_3, labels)
         _loss_3.backward()
         optimzer.step()
@@ -404,6 +407,8 @@ def _CUB200():
     # 定义模型 定义评价 优化器等
     lr = 1e-4
     class_num = 200
+    torch.manual_seed(0)
+    torch.cuda.manual_seed_all(0)
     print("cuda:0,1,2,3")
     device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
     model = Net(resnet_for_pmg.resnet50(pretrained=True), class_num)
@@ -431,7 +436,7 @@ def _CUB200():
     torch.optim.lr_scheduler.CosineAnnealingLR(optimzer, T_max=10)
     epochs = 200
     batchSize = 64
-    worker = 2
+    worker = 4
     modelConfig = {
         'model': model,
         'criterion': criterion,

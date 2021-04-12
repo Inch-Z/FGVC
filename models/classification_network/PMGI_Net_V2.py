@@ -99,13 +99,13 @@ class PMGI_V2(nn.Module):
         x3 = torch.mul(gate3, xl3) + xl3
 
 
-        # xc1 = self.classifier1(x1)
-        # xc2 = self.classifier2(x2)
-        # xc3 = self.classifier3(x3)
-        # or
         xc1 = self.classifier1(x1)
-        xc2 = self.classifier1(x2)
-        xc3 = self.classifier1(x3)
+        xc2 = self.classifier2(x2)
+        xc3 = self.classifier3(x3)
+        # or
+        # xc1 = self.classifier1(x1)
+        # xc2 = self.classifier1(x2)
+        # xc3 = self.classifier1(x3)
         # or
         # xc1 = self.fc(x1)
         # xc2 = self.fc(x2)

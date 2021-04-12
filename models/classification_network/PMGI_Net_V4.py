@@ -8,7 +8,10 @@ class PMGI_V4(nn.Module):
         print("PMGI_V4")
         self.features = model
         self.maxpool = nn.AdaptiveMaxPool2d((1, 1))
+<<<<<<< HEAD
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+=======
+>>>>>>> origin/master
 
         self.num_ftrs = 2048 * 1 * 1
         self.elu = nn.ELU(inplace=True)
@@ -71,10 +74,15 @@ class PMGI_V4(nn.Module):
     # 双线性池化交互
     def hbp(self, conv1, conv2):
         X = conv1 * conv2
+<<<<<<< HEAD
         # X = torch.sum(X.view(X.size()[0], X.size()[1], -1), dim=2)
         # X = torch.sqrt(X + 1e-5)
         X = self.avgpool(X).view(X.size()[0], -1)
         X = torch.sign(X) * torch.sqrt(torch.abs(X) + 1e-10)
+=======
+        X = torch.sum(X.view(X.size()[0], X.size()[1], -1), dim=2)
+        X = torch.sqrt(X + 1e-5)
+>>>>>>> origin/master
         X = torch.nn.functional.normalize(X)
         return X
 
@@ -123,4 +131,8 @@ class BasicConv(nn.Module):
             x = self.bn(x)
         if self.relu is not None:
             x = self.relu(x)
+<<<<<<< HEAD
         return x
+=======
+        return x
+>>>>>>> origin/master
