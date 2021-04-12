@@ -75,8 +75,6 @@ class PMGI_V4(nn.Module):
         # X = torch.sqrt(X + 1e-5)
         X = self.avgpool(X).view(X.size()[0], -1)
         X = torch.sign(X) * torch.sqrt(torch.abs(X) + 1e-10)
-        X = torch.sum(X.view(X.size()[0], X.size()[1], -1), dim=2)
-        X = torch.sqrt(X + 1e-5)
         X = torch.nn.functional.normalize(X)
         return X
 
