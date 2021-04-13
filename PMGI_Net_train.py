@@ -343,7 +343,7 @@ def _stanfordDogs():
     # torch.optim.lr_scheduler.StepLR(optimzer, 10, gamma=0.94, last_epoch=-1)
     torch.optim.lr_scheduler.CosineAnnealingLR(optimzer, T_max=10)
     epochs = 200
-    batchSize = 15
+    batchSize = 64
     worker = 2
     modelConfig = {
         'model': model,

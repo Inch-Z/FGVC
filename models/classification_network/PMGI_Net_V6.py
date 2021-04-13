@@ -61,41 +61,65 @@ class PMGI_V2(nn.Module):
             nn.Linear(feature_size, classes_num),
         )
 
-        self.map1 = nn.Linear((self.num_ftrs // 2) * 3, feature_size)
-        self.map2 = nn.Linear(feature_size, (self.num_ftrs // 2))
-        self.fc = nn.Linear(self.num_ftrs // 2, classes_num)
+        self.map1 = nn.Linear((feature_size) * 3, feature_size)
+        self.map2 = nn.Linear(feature_size, (feature_size))
+        self.fc = nn.Linear(feature_size // 2, classes_num)
         self.drop = nn.Dropout(p=0.5)
         self.sigmoid = nn.Sigmoid()
 
-    # 双线性池化交互
-    def hbp(self, conv1, conv2):
-        X = conv1 * conv2
-        X = torch.sum(X.view(X.size()[0], X.size()[1], -1), dim=2)
-        X = torch.sqrt(X + 1e-5)
-        X = torch.nn.functional.normalize(X)
-        return X
 
     def forward(self, x1, x2, x3, train_flag):
         _, _, _, _, x1 = self.features(x1)
         _, _, _, _, x2 = self.features(x2)
         _, _, _, _, x3 = self.features(x3)
 
-        x1 = self.conv_block1(x1)
-        x2 = self.conv_block1(x2)
-        x3 = self.conv_block1(x3)
+        x1 = self.conv_block1(x1)  # [bs, feature-size, 14, 14]
+        x2 = self.conv_block1(x2)  # [bs, feature-size, 14, 14]
+        x3 = self.conv_block1(x3)  # [bs, feature-size, 14, 14]
 
-        # HBP-Part, 三种切块的特征交互
-        x_branch_1 = self.hbp(x1, x2)
-        x_branch_2 = self.hbp(x2, x3)
-        x_branch_3 = self.hbp(x1, x3)
+        xl1 = self.maxpool(x1)
+        xl1 = xl1.view(xl1.size(0), -1)
 
-        x_concat = torch.cat([x_branch_1, x_branch_2, x_branch_3], dim=1)
+        xl2 = self.maxpool(x2)
+        xl2 = xl2.view(xl2.size(0), -1)
+
+        xl3 = self.maxpool(x3)
+        xl3 = xl3.view(xl3.size(0), -1)
+
+        x_concat = torch.cat([xl1, xl2, xl3], dim=1)
+
+        # API-Part
+        feas = self.map1(x_concat)
+        feas = self.drop(feas)
+        feas = self.map2(feas)
+
+        gate1 = torch.mul(feas, xl1)
+        gate1 = self.sigmoid(gate1)
+        gate2 = torch.mul(feas, xl2)
+        gate2 = self.sigmoid(gate2)
+        gate3 = torch.mul(feas, xl3)
+        gate3 = self.sigmoid(gate3)
+
+        x1 = torch.mul(gate1, xl1) + xl1
+        x2 = torch.mul(gate2, xl2) + xl2
+        x3 = torch.mul(gate3, xl3) + xl3
+
 
         # PMG-Part
-        xc1 = self.classifier1(x_branch_1)
-        xc2 = self.classifier2(x_branch_2)
-        xc3 = self.classifier3(x_branch_3)
-        x_concat = self.classifier_concat(x_concat)
+        xc1 = self.classifier1(x1)
+        xc2 = self.classifier2(x2)
+        xc3 = self.classifier3(x3)
+        # or
+        # xc1 = self.classifier1(x1)
+        # xc2 = self.classifier1(x2)
+        # xc3 = self.classifier1(x3)
+        # or
+        # xc1 = self.fc(x1)
+        # xc2 = self.fc(x2)
+        # xc3 = self.fc(x3)
+
+        features = torch.cat([x1, x2, x3], dim=1)
+        x_concat = self.classifier_concat(features)
 
 
         return xc1, xc2, xc3, x_concat
