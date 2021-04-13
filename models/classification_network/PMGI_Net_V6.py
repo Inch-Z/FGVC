@@ -2,10 +2,10 @@ import torch.nn as nn
 import torch
 
 
-class PMGI_V2(nn.Module):
+class PMGI_V6(nn.Module):
     def __init__(self, model, feature_size, classes_num):
-        super(PMGI_V2, self).__init__()
-
+        super(PMGI_V6, self).__init__()
+        print("PMGI_V6")
         self.features = model
         self.maxpool = nn.AdaptiveMaxPool2d((1, 1))
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
