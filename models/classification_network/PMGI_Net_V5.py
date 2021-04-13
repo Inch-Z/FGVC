@@ -5,7 +5,7 @@ import torch
 class PMGI_V5(nn.Module):
     def __init__(self, model, feature_size, classes_num):
         super(PMGI_V5, self).__init__()
-        print("PMGI_V5")
+
 
         self.features = model
         self.maxpool = nn.AdaptiveMaxPool2d((1, 1))
@@ -82,8 +82,8 @@ class PMGI_V5(nn.Module):
         _, _, _, _, x3 = self.features(x3)
 
         x1 = self.conv_block1(x1)
-        x2 = self.conv_block1(x2)
-        x3 = self.conv_block1(x3)
+        x2 = self.conv_block2(x2)
+        x3 = self.conv_block3(x3)
 
         # HBP-Part, 三种切块的特征交互
         x_branch_1 = self.hbp(x1, x2)
