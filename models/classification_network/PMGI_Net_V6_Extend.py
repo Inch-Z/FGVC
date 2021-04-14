@@ -2,43 +2,47 @@ import torch.nn as nn
 import torch
 
 
-class PMGI(nn.Module):
+class PMGI_V6_Extend(nn.Module):
     def __init__(self, model, feature_size, classes_num):
-        super(PMGI, self).__init__()
-
+        super(PMGI_V6_Extend, self).__init__()
+        print("PMGI_V6_Extend")
         self.features = model
         self.maxpool = nn.AdaptiveMaxPool2d((1, 1))
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
         self.num_ftrs = 2048 * 1 * 1
         self.elu = nn.ELU(inplace=True)
 
         self.classifier_concat = nn.Sequential(
-            nn.BatchNorm1d(1024 * 3),
-            nn.Linear(1024 * 3, feature_size),
+            nn.BatchNorm1d(feature_size * 3),
+            nn.ELU(inplace=True),
+            nn.Linear(feature_size * 3, feature_size),
             nn.BatchNorm1d(feature_size),
             nn.ELU(inplace=True),
             nn.Linear(feature_size, classes_num),
         )
 
         self.conv_block1 = nn.Sequential(
-            BasicConv(self.num_ftrs // 4, feature_size, kernel_size=1, stride=1, padding=0, relu=True),
-            BasicConv(feature_size, self.num_ftrs // 2, kernel_size=3, stride=1, padding=1, relu=True)
+            BasicConv(self.num_ftrs, feature_size, kernel_size=1, stride=1, padding=0, relu=True),
+            BasicConv(feature_size, feature_size, kernel_size=3, stride=1, padding=1, relu=True)
         )
         self.classifier1 = nn.Sequential(
-            nn.BatchNorm1d(self.num_ftrs // 2),
-            nn.Linear(self.num_ftrs // 2, feature_size),
+            nn.BatchNorm1d(feature_size),
+            nn.ELU(inplace=True),
+            nn.Linear(feature_size, feature_size),
             nn.BatchNorm1d(feature_size),
             nn.ELU(inplace=True),
             nn.Linear(feature_size, classes_num),
         )
 
         self.conv_block2 = nn.Sequential(
-            BasicConv(self.num_ftrs // 2, feature_size, kernel_size=1, stride=1, padding=0, relu=True),
-            BasicConv(feature_size, self.num_ftrs // 2, kernel_size=3, stride=1, padding=1, relu=True)
+            BasicConv(self.num_ftrs, feature_size, kernel_size=1, stride=1, padding=0, relu=True),
+            BasicConv(feature_size, feature_size, kernel_size=3, stride=1, padding=1, relu=True)
         )
         self.classifier2 = nn.Sequential(
-            nn.BatchNorm1d(self.num_ftrs // 2),
-            nn.Linear(self.num_ftrs // 2, feature_size),
+            nn.BatchNorm1d(feature_size),
+            nn.ELU(inplace=True),
+            nn.Linear(feature_size, feature_size),
             nn.BatchNorm1d(feature_size),
             nn.ELU(inplace=True),
             nn.Linear(feature_size, classes_num),
@@ -46,44 +50,51 @@ class PMGI(nn.Module):
 
         self.conv_block3 = nn.Sequential(
             BasicConv(self.num_ftrs, feature_size, kernel_size=1, stride=1, padding=0, relu=True),
-            BasicConv(feature_size, self.num_ftrs // 2, kernel_size=3, stride=1, padding=1, relu=True)
+            BasicConv(feature_size, feature_size, kernel_size=3, stride=1, padding=1, relu=True)
         )
         self.classifier3 = nn.Sequential(
-            nn.BatchNorm1d(self.num_ftrs // 2),
-            nn.Linear(self.num_ftrs // 2, feature_size),
+            nn.BatchNorm1d(feature_size),
+            nn.ELU(inplace=True),
+            nn.Linear(feature_size, feature_size),
             nn.BatchNorm1d(feature_size),
             nn.ELU(inplace=True),
             nn.Linear(feature_size, classes_num),
         )
 
-        self.map1 = nn.Linear((self.num_ftrs // 2) * 3, feature_size)
-        self.map2 = nn.Linear(feature_size, (self.num_ftrs // 2))
+        self.map1 = nn.Linear(feature_size * 3, feature_size)
+        self.map2 = nn.Linear(feature_size, feature_size)
+        self.fc = nn.Linear(feature_size // 2, classes_num)
         self.drop = nn.Dropout(p=0.5)
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, x, train_flag):
-        xf1, xf2, xf3, xf4, xf5 = self.features(x)
 
-        # PMG-Part
-        xl1 = self.conv_block1(xf3)
-        xl2 = self.conv_block2(xf4)
-        xl3 = self.conv_block3(xf5)
+    def forward(self, x1, x2, x3, train_flag):
+        _, _, _, _, x1 = self.features(x1)
+        _, _, _, _, x2 = self.features(x2)
+        _, _, _, _, x3 = self.features(x3)
 
-        xl1 = self.maxpool(xl1)
+        x1 = self.conv_block1(x1)  # [bs, feature-size, 14, 14]
+        x2 = self.conv_block1(x2)  # [bs, feature-size, 14, 14]
+        x3 = self.conv_block1(x3)  # [bs, feature-size, 14, 14]
+
+        # xl1 = self.maxpool(x1)
+        xl1 = self.avgpool(x1)
         xl1 = xl1.view(xl1.size(0), -1)
-        xc1 = self.classifier1(xl1)
 
-        xl2 = self.maxpool(xl2)
+        # xl2 = self.maxpool(x2)
+        xl2 = self.avgpool(x2)
         xl2 = xl2.view(xl2.size(0), -1)
-        xc2 = self.classifier2(xl2)
 
-        xl3 = self.maxpool(xl3)
+        # xl3 = self.maxpool(x3)
+        xl3 = self.avgpool(x3)
         xl3 = xl3.view(xl3.size(0), -1)
-        xc3 = self.classifier3(xl3)
 
-        x_concat = torch.cat((xl1, xl2, xl3), -1)
+        # xc1 = self.classifier1(xl1)
+        # xc2 = self.classifier2(xl2)
+        # xc3 = self.classifier3(xl3)
 
-        x_concat = self.classifier_concat(x_concat)
+        x_concat = torch.cat([xl1, xl2, xl3], dim=1)
+
 
         # API-Part
         feas = self.map1(x_concat)
@@ -100,6 +111,20 @@ class PMGI(nn.Module):
         x1 = torch.mul(gate1, xl1) + xl1
         x2 = torch.mul(gate2, xl2) + xl2
         x3 = torch.mul(gate3, xl3) + xl3
+
+
+        # PMG-Part
+        xc1 = self.classifier1(x1)
+        xc2 = self.classifier2(x2)
+        xc3 = self.classifier3(x3)
+        # or
+        # xc1 = self.classifier1(x1)
+        # xc2 = self.classifier1(x2)
+        # xc3 = self.classifier1(x3)
+        # or
+        # xc1 = self.fc(x1)
+        # xc2 = self.fc(x2)
+        # xc3 = self.fc(x3)
 
         features = torch.cat([x1, x2, x3], dim=1)
         x_concat = self.classifier_concat(features)

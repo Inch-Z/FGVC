@@ -5,8 +5,7 @@ import os
 from utils import saveModel, loadModel, chooseData, writeHistory, writeLog, jigsaw_generator
 import time
 from models.backbone import resnet_for_pmg
-from models.classification_network.PMGI_Net_V7 import PMGI_V7
-from models.classification_network.PMGI_Net_V8 import PMGI_V8
+from models.classification_network.PMGI_Net_V7_Extend import PMGI_V7_Extend
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1, 2, 3'
 
@@ -16,12 +15,12 @@ class Net(nn.Module):
         super(Net, self).__init__()
         # 选择resnet 除最后一层的全连接，改为CLASS输出
         self.model = nn.Sequential(*list(model.children())[:-1])
-        self.pmg = PMGI_V7(model, feature_size=512, classes_num=CLASS)
-        # self.pmg = PMGI_V8(model, feature_size=512, classes_num=CLASS)
+        # PMGI_V7_Extend
+        self.pmg = PMGI_V7_Extend(model, feature_size=512, classes_num=CLASS)
 
     def forward(self, x, train_flag='train'):
-        x1, x2, x3, x_concat= self.pmg(x, train_flag)
-        return x1, x2, x3, x_concat
+        x1, x2, x3 = self.pmg(x, train_flag)
+        return x1, x2, x3
 
 
 def train(modelConfig, dataConfig, logConfig):
@@ -139,7 +138,7 @@ def train(modelConfig, dataConfig, logConfig):
         best_L3_log = now + ' best L3 Acc is {:.4f}%\n'.format(100 * best_L3_Acc)
         best_concat_log = now + ' best concat Acc is {:.4f}%\n'.format(100 * best_concat_Acc)
         best_com_log = now + ' best com Acc is {:.4f}%\n'.format(100 * best_com_Acc)
-        best_epoch_log = now + ' best Acc epoch is :' + str(best_epoch) + "\n\n"
+        best_epoch_log = now + ' best Acc epoch is :' + str(best_epoch) + "\n"
 
         train_log = train_L1_Log + train_L2_Log + train_L3_Log + train_concat_Log + train_total_Log
         val_log = val_L1_log + val_L2_log + val_L3_log + val_concat_log + val_com_log
@@ -156,7 +155,7 @@ def train(modelConfig, dataConfig, logConfig):
         #     'validAcces':validAcces
         # }
 
-        writeLog(logPath, train_log + val_log + best_log)
+        writeLog(logPath, best_log)
         # writeHistory(historyPath,history)
 
         # 保存最新一次模型
@@ -193,50 +192,43 @@ def oneEpoch_train(model, dataLoader, optimzer, criterion, device):
         # 梯度设为零，求前向传播的值
         # step 1
         optimzer.zero_grad()
-        # inputs1 = jigsaw_generator(inputs, 8)
-        output_1, _, _, _ = model(x=inputs, train_flag="train")
+        inputs1 = jigsaw_generator(inputs, 4)
+        output_1, _, _ = model(x=inputs1, train_flag="train")
         _loss_1 = criterion(output_1, labels_2)
         _loss_1.backward()
         optimzer.step()
 
         # step 2
         optimzer.zero_grad()
-        # inputs2 = jigsaw_generator(inputs, 4)
-        _, output_2, _, _ = model(x=inputs, train_flag="train")
+        inputs2 = jigsaw_generator(inputs, 2)
+        _, output_2, _ = model(x=inputs2, train_flag="train")
         _loss_2 = criterion(output_2, labels_2)
         _loss_2.backward()
         optimzer.step()
 
         # step 3
         optimzer.zero_grad()
-        # inputs3 = jigsaw_generator(inputs, 2)
-        _, _, output_3, _ = model(x=inputs, train_flag="train")
+        # inputs3 = jigsaw_generator(inputs, 1)
+        _, _, output_3 = model(x=inputs, train_flag="train")
         _loss_3 = criterion(output_3, labels_2)
         _loss_3.backward()
         optimzer.step()
 
-        # step 4
-        optimzer.zero_grad()
-        _, _, _, output_4 = model(x=inputs, train_flag="train")
-        _loss_concat = criterion(output_4, labels) * 2
-        _loss_concat.backward()
-        optimzer.step()
 
         _, preds_1 = torch.max(output_1.data, 1)
         _, preds_2 = torch.max(output_2.data, 1)
         _, preds_3 = torch.max(output_3.data, 1)
-        _, preds = torch.max(output_4.data, 1)
 
-        loss += (_loss_1.item() + _loss_2.item() + _loss_3.item() + _loss_concat.item())
+
+        loss += (_loss_1.item() + _loss_2.item() + _loss_3.item())
         loss_1 += _loss_1.item()
         loss_2 += _loss_2.item()
         loss_3 += _loss_3.item()
-        loss_concat += _loss_concat.item()
+
 
         acc_1 += torch.sum(preds_1 == labels_2).item()
         acc_2 += torch.sum(preds_2 == labels_2).item()
         acc_3 += torch.sum(preds_3 == labels_2).item()
-        acc_concat += torch.sum(preds == labels).item()
 
     return loss_1, loss_2, loss_3, loss_concat, loss, acc_1, acc_2, acc_3, acc_concat
 
@@ -265,34 +257,30 @@ def oneEpoch_valid(model, dataLoader, criterion, device):
         for (inputs, labels) in dataLoader:
             inputs, labels = inputs.to(f'cuda:{model.device_ids[0]}'), labels.to(f'cuda:{model.device_ids[0]}')
             inputs, labels = Variable(inputs), Variable(labels)
-            labels_2 = torch.cat([labels, labels], dim=0)
-            outputs1, outputs2, outputs3, outputs_concat = model(x=inputs, train_flag="val")
+
+            outputs1, outputs2, outputs3 = model(x=inputs, train_flag="val")
 
             outputs_com = outputs1 + outputs2 + outputs3
 
-            _loss_1 = criterion(outputs1, labels_2)
-            _loss_2 = criterion(outputs2, labels_2)
-            _loss_3 = criterion(outputs3, labels_2)
-            _loss_concat = criterion(outputs_concat, labels)
-            _loss_com = criterion(outputs_com, labels_2)
+            _loss_1 = criterion(outputs1, labels)
+            _loss_2 = criterion(outputs2, labels)
+            _loss_3 = criterion(outputs3, labels)
+            _loss_com = criterion(outputs_com, labels)
 
             _, preds_1 = torch.max(outputs1.data, 1)
             _, preds_2 = torch.max(outputs2.data, 1)
             _, preds_3 = torch.max(outputs3.data, 1)
-            _, preds_concat = torch.max(outputs_concat.data, 1)
             _, predicted_com = torch.max(outputs_com.data, 1)
 
             loss_1 += _loss_1.item()
             loss_2 += _loss_2.item()
             loss_3 += _loss_3.item()
-            loss_concat += _loss_concat.item()
             loss_com += _loss_com.item()
 
-            acc_1 += torch.sum(preds_1 == labels_2).item()
-            acc_2 += torch.sum(preds_2 == labels_2).item()
-            acc_3 += torch.sum(preds_3 == labels_2).item()
-            acc_concat += torch.sum(preds_concat == labels).item()
-            acc_com += torch.sum(predicted_com == labels_2).item()
+            acc_1 += torch.sum(preds_1 == labels).item()
+            acc_2 += torch.sum(preds_2 == labels).item()
+            acc_3 += torch.sum(preds_3 == labels).item()
+            acc_com += torch.sum(predicted_com == labels).item()
 
     return loss_1, acc_1, loss_2, acc_2, loss_3, acc_3, loss_concat, acc_concat, loss_com, acc_com
 
@@ -316,23 +304,19 @@ def _stanfordDogs():
 
     optimzer = torch.optim.SGD([
         {'params': model.module.pmg.features.parameters(), 'lr': lr * 1},
-        {'params': model.module.pmg.classifier_concat.parameters(), 'lr': lr * 10},
         {'params': model.module.pmg.classifier1.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.classifier2.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.classifier3.parameters(), 'lr': lr * 10},
         {'params': model.module.pmg.conv_block1.parameters(), 'lr': lr * 10},
         {'params': model.module.pmg.conv_block2.parameters(), 'lr': lr * 10},
         {'params': model.module.pmg.conv_block3.parameters(), 'lr': lr * 10},
         {'params': model.module.pmg.map1.parameters(), 'lr': lr * 10},
         {'params': model.module.pmg.map2.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.fc.parameters(), 'lr': lr * 10},
     ],
         lr=lr, momentum=0.9, weight_decay=5e-4)
 
     # torch.optim.lr_scheduler.StepLR(optimzer, 10, gamma=0.94, last_epoch=-1)
     torch.optim.lr_scheduler.CosineAnnealingLR(optimzer, T_max=10)
     epochs = 200
-    batchSize = 64
+    batchSize = 15
     worker = 2
     modelConfig = {
         'model': model,
@@ -396,9 +380,7 @@ def _CUB200():
     # 定义模型 定义评价 优化器等
     lr = 1e-4
     class_num = 200
-    torch.manual_seed(0)
-    torch.cuda.manual_seed_all(0)
-    print("cuda:0,1,2,3")
+    print("cuda:0, 1, 2, 3")
     device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
     model = Net(resnet_for_pmg.resnet50(pretrained=True), class_num)
     device_ids = [0, 1, 2 ,3]
@@ -425,7 +407,7 @@ def _CUB200():
     torch.optim.lr_scheduler.CosineAnnealingLR(optimzer, T_max=10)
     epochs = 200
     batchSize = 64
-    worker = 4
+    worker = 2
     modelConfig = {
         'model': model,
         'criterion': criterion,

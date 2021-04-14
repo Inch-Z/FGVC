@@ -2,10 +2,10 @@ import torch.nn as nn
 import torch
 
 
-class PMGI_V6(nn.Module):
+class PMGI_V8(nn.Module):
     def __init__(self, model, feature_size, classes_num):
-        super(PMGI_V6, self).__init__()
-        print("PMGI_V6")
+        super(PMGI_V8, self).__init__()
+        print("PMGI_V8")
         self.features = model
         self.maxpool = nn.AdaptiveMaxPool2d((1, 1))
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
@@ -77,22 +77,25 @@ class PMGI_V6(nn.Module):
         x2 = self.conv_block1(x2)  # [bs, feature-size, 14, 14]
         x3 = self.conv_block1(x3)  # [bs, feature-size, 14, 14]
 
-        # xl1 = self.maxpool(x1)
-        xl1 = self.avgpool(x1)
+        xl1 = self.maxpool(x1)
+        # xl1 = self.avgpool(x1)
         xl1 = xl1.view(xl1.size(0), -1)
 
-        # xl2 = self.maxpool(x2)
-        xl2 = self.avgpool(x2)
+        xl2 = self.maxpool(x2)
+        # xl2 = self.avgpool(x2)
         xl2 = xl2.view(xl2.size(0), -1)
 
-        # xl3 = self.maxpool(x3)
-        xl3 = self.avgpool(x3)
+        xl3 = self.maxpool(x3)
+        # xl3 = self.avgpool(x3)
         xl3 = xl3.view(xl3.size(0), -1)
+
+        # xc1 = self.classifier1(xl1)
+        # xc2 = self.classifier2(xl2)
+        # xc3 = self.classifier3(xl3)
 
         x_concat = torch.cat([xl1, xl2, xl3], dim=1)
 
-
-        # API-Part
+        # PMG-Part
         feas = self.map1(x_concat)
         feas = self.drop(feas)
         feas = self.map2(feas)
@@ -104,27 +107,31 @@ class PMGI_V6(nn.Module):
         gate3 = torch.mul(feas, xl3)
         gate3 = self.sigmoid(gate3)
 
-        x1 = torch.mul(gate1, xl1) + xl1
-        x2 = torch.mul(gate2, xl2) + xl2
-        x3 = torch.mul(gate3, xl3) + xl3
+        gate1 = torch.mul(gate1, xl1)
+        gate2 = torch.mul(gate2, xl2)
+        gate3 = torch.mul(gate3, xl3)
 
+        x1_self = gate1 + xl1
+        x2_self = gate2 + xl2
+        x3_self = gate3 + xl3
 
-        # PMG-Part
-        xc1 = self.classifier1(x1)
-        xc2 = self.classifier2(x2)
-        xc3 = self.classifier3(x3)
-        # or
-        # xc1 = self.classifier1(x1)
-        # xc2 = self.classifier1(x2)
-        # xc3 = self.classifier1(x3)
-        # or
-        # xc1 = self.fc(x1)
-        # xc2 = self.fc(x2)
-        # xc3 = self.fc(x3)
+        x1_other = xl1 + gate2 + gate3
+        x2_other = xl2 + gate1 + gate3
+        x3_other = xl3 + gate1 + gate2
 
-        features = torch.cat([x1, x2, x3], dim=1)
+        xc1_self = self.classifier1(x1_self)
+        xc1_other = self.classifier1(x1_other)
+        xc2_self = self.classifier2(x2_self)
+        xc2_other = self.classifier2(x2_other)
+        xc3_self = self.classifier3(x3_self)
+        xc3_other = self.classifier3(x3_other)
+
+        xc1 = torch.cat([xc1_self, xc1_other], dim=0)
+        xc2 = torch.cat([xc2_self, xc2_other], dim=0)
+        xc3 = torch.cat([xc3_self, xc3_other], dim=0)
+
+        features = torch.cat([x1_self, x1_other, x2_self, x2_other, x3_self, x3_other], dim=1)
         x_concat = self.classifier_concat(features)
-
 
         return xc1, xc2, xc3, x_concat
 

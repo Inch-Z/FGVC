@@ -5,7 +5,7 @@ import torch
 class PMGI_V3(nn.Module):
     def __init__(self, model, feature_size, classes_num):
         super(PMGI_V3, self).__init__()
-        print("PMGI_V3")
+        print("PMG-V3")
 
         self.features = model
         self.maxpool = nn.AdaptiveMaxPool2d((1, 1))

@@ -5,8 +5,7 @@ import os
 from utils import saveModel, loadModel, chooseData, writeHistory, writeLog, jigsaw_generator
 import time
 from models.backbone import resnet_for_pmg
-from models.classification_network.PMGI_Net_V7 import PMGI_V7
-from models.classification_network.PMGI_Net_V8 import PMGI_V8
+from models.classification_network.PMGI_Net_V6_Extend import PMGI_V6_Extend
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1, 2, 3'
 
@@ -16,11 +15,10 @@ class Net(nn.Module):
         super(Net, self).__init__()
         # 选择resnet 除最后一层的全连接，改为CLASS输出
         self.model = nn.Sequential(*list(model.children())[:-1])
-        self.pmg = PMGI_V7(model, feature_size=512, classes_num=CLASS)
-        # self.pmg = PMGI_V8(model, feature_size=512, classes_num=CLASS)
+        self.pmg = PMGI_V6_Extend(model, feature_size=512, classes_num=CLASS)
 
-    def forward(self, x, train_flag='train'):
-        x1, x2, x3, x_concat= self.pmg(x, train_flag)
+    def forward(self, x1, x2, x3, train_flag='train'):
+        x1, x2, x3, x_concat= self.pmg(x1, x2, x3, train_flag)
         return x1, x2, x3, x_concat
 
 
@@ -189,38 +187,26 @@ def oneEpoch_train(model, dataLoader, optimzer, criterion, device):
         # 使用某个GPU加速图像 label 计算
         inputs, labels = inputs.to(f'cuda:{model.device_ids[0]}'), labels.to(f'cuda:{model.device_ids[0]}')
         inputs, labels = Variable(inputs), Variable(labels)
-        labels_2 = torch.cat([labels, labels], dim=0)
+        inputs_1 = inputs
+        inputs_2 = jigsaw_generator(inputs, 2)
+        inputs_4 = jigsaw_generator(inputs, 4)
+        labels_2 = labels
+        for i in range(4-1):
+            labels_2 = torch.cat([labels_2, labels], dim=0)
+
         # 梯度设为零，求前向传播的值
         # step 1
         optimzer.zero_grad()
-        # inputs1 = jigsaw_generator(inputs, 8)
-        output_1, _, _, _ = model(x=inputs, train_flag="train")
-        _loss_1 = criterion(output_1, labels_2)
-        _loss_1.backward()
-        optimzer.step()
-
-        # step 2
-        optimzer.zero_grad()
-        # inputs2 = jigsaw_generator(inputs, 4)
-        _, output_2, _, _ = model(x=inputs, train_flag="train")
-        _loss_2 = criterion(output_2, labels_2)
-        _loss_2.backward()
-        optimzer.step()
-
-        # step 3
-        optimzer.zero_grad()
-        # inputs3 = jigsaw_generator(inputs, 2)
-        _, _, output_3, _ = model(x=inputs, train_flag="train")
-        _loss_3 = criterion(output_3, labels_2)
-        _loss_3.backward()
-        optimzer.step()
-
-        # step 4
-        optimzer.zero_grad()
-        _, _, _, output_4 = model(x=inputs, train_flag="train")
-        _loss_concat = criterion(output_4, labels) * 2
+        output_1, output_2, output_3, output_4 = model(x1=inputs_1, x2=inputs_2, x3=inputs_4, train_flag="train")
+        output_all = torch.cat([output_1, output_2, output_3, output_4], dim=0)
+        _loss_1 = criterion(output_1, labels)
+        _loss_2 = criterion(output_2, labels)
+        _loss_3 = criterion(output_3, labels)
+        _loss_4 = criterion(output_4, labels)
+        _loss_concat = criterion(output_all, labels_2)
         _loss_concat.backward()
         optimzer.step()
+
 
         _, preds_1 = torch.max(output_1.data, 1)
         _, preds_2 = torch.max(output_2.data, 1)
@@ -233,10 +219,10 @@ def oneEpoch_train(model, dataLoader, optimzer, criterion, device):
         loss_3 += _loss_3.item()
         loss_concat += _loss_concat.item()
 
-        acc_1 += torch.sum(preds_1 == labels_2).item()
-        acc_2 += torch.sum(preds_2 == labels_2).item()
-        acc_3 += torch.sum(preds_3 == labels_2).item()
-        acc_concat += torch.sum(preds == labels).item()
+        acc_1 += torch.sum(preds_1 == labels).item()
+        acc_2 += torch.sum(preds_2 == labels).item()
+        acc_3 += torch.sum(preds_3 == labels).item()
+        acc_concat += torch.sum(preds == labels_2).item()
 
     return loss_1, loss_2, loss_3, loss_concat, loss, acc_1, acc_2, acc_3, acc_concat
 
@@ -265,16 +251,16 @@ def oneEpoch_valid(model, dataLoader, criterion, device):
         for (inputs, labels) in dataLoader:
             inputs, labels = inputs.to(f'cuda:{model.device_ids[0]}'), labels.to(f'cuda:{model.device_ids[0]}')
             inputs, labels = Variable(inputs), Variable(labels)
-            labels_2 = torch.cat([labels, labels], dim=0)
-            outputs1, outputs2, outputs3, outputs_concat = model(x=inputs, train_flag="val")
 
-            outputs_com = outputs1 + outputs2 + outputs3
+            outputs1, outputs2, outputs3, outputs_concat = model(x1=inputs, x2=inputs, x3=inputs,train_flag="val")
 
-            _loss_1 = criterion(outputs1, labels_2)
-            _loss_2 = criterion(outputs2, labels_2)
-            _loss_3 = criterion(outputs3, labels_2)
+            outputs_com = outputs1 + outputs2 + outputs3 + outputs_concat
+
+            _loss_1 = criterion(outputs1, labels)
+            _loss_2 = criterion(outputs2, labels)
+            _loss_3 = criterion(outputs3, labels)
             _loss_concat = criterion(outputs_concat, labels)
-            _loss_com = criterion(outputs_com, labels_2)
+            _loss_com = criterion(outputs_com, labels)
 
             _, preds_1 = torch.max(outputs1.data, 1)
             _, preds_2 = torch.max(outputs2.data, 1)
@@ -288,104 +274,13 @@ def oneEpoch_valid(model, dataLoader, criterion, device):
             loss_concat += _loss_concat.item()
             loss_com += _loss_com.item()
 
-            acc_1 += torch.sum(preds_1 == labels_2).item()
-            acc_2 += torch.sum(preds_2 == labels_2).item()
-            acc_3 += torch.sum(preds_3 == labels_2).item()
+            acc_1 += torch.sum(preds_1 == labels).item()
+            acc_2 += torch.sum(preds_2 == labels).item()
+            acc_3 += torch.sum(preds_3 == labels).item()
             acc_concat += torch.sum(preds_concat == labels).item()
-            acc_com += torch.sum(predicted_com == labels_2).item()
+            acc_com += torch.sum(predicted_com == labels).item()
 
     return loss_1, acc_1, loss_2, acc_2, loss_3, acc_3, loss_concat, acc_concat, loss_com, acc_com
-
-
-def _stanfordDogs():
-    """
-     StanfordDogs数据集
-     :return:
-     """
-
-    # 定义模型 定义评价 优化器等
-    lr = 1e-4
-    class_num = 120
-    print("cuda:2")
-    device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
-    model = Net(resnet_for_pmg.resnet50(pretrained=True), class_num)
-    device_ids = [0]
-    model = nn.DataParallel(model, device_ids=device_ids).cuda(0)
-    model.to(f'cuda:{model.device_ids[0]}')
-    criterion = torch.nn.CrossEntropyLoss()
-
-    optimzer = torch.optim.SGD([
-        {'params': model.module.pmg.features.parameters(), 'lr': lr * 1},
-        {'params': model.module.pmg.classifier_concat.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.classifier1.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.classifier2.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.classifier3.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.conv_block1.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.conv_block2.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.conv_block3.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.map1.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.map2.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.fc.parameters(), 'lr': lr * 10},
-    ],
-        lr=lr, momentum=0.9, weight_decay=5e-4)
-
-    # torch.optim.lr_scheduler.StepLR(optimzer, 10, gamma=0.94, last_epoch=-1)
-    torch.optim.lr_scheduler.CosineAnnealingLR(optimzer, T_max=10)
-    epochs = 200
-    batchSize = 64
-    worker = 2
-    modelConfig = {
-        'model': model,
-        'criterion': criterion,
-        'optimzer': optimzer,
-        'epochs': epochs,
-        'device': device
-    }
-
-    from torchvision import transforms as T
-    # 自定义数据增强方式
-    # normalize 加快收敛
-    # normalize = T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    trainTransforms = T.Compose([
-        T.Resize(256),
-        T.RandomRotation(15),
-        # T.RandomResizedCrop(224,scale=(0.85,1.15)),
-        T.RandomCrop(224),
-        T.ToTensor(),
-        T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-    ])
-
-    testTransforms = T.Compose([
-        T.Resize(256),
-        T.CenterCrop(224),
-        T.ToTensor(),
-        T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-    ])
-
-    trainLoader, testLoader, validLoader, trainLength, testLength, validLength = chooseData('STANFORDDOGS', batchSize,
-                                                                                            worker, trainTransforms,
-                                                                                            testTransforms)
-    # 没有验证集，所以使用测试集来做验证集
-    dataConfig = {
-        'trainLoader': trainLoader,
-        'validLoader': testLoader,
-        'trainLength': trainLength,
-        'validLength': testLength
-    }
-
-    modelPath = os.path.join(os.getcwd(), 'checkpoints', '_stanforddogs.pth')
-    lastModelPath = os.path.join(os.getcwd(), 'checkpoints', '_stanforddogs_last.pth')
-    historyPath = os.path.join(os.getcwd(), 'historys', '_stanforddogs.npy')
-    logPath = os.path.join(os.getcwd(), 'logs', '_stanforddogs.txt')
-
-    logConfig = {
-        'modelPath': modelPath,
-        'historyPath': historyPath,
-        'logPath': logPath,
-        'lastModelPath': lastModelPath
-    }
-
-    train(modelConfig, dataConfig, logConfig)
 
 
 def _CUB200():
@@ -424,7 +319,7 @@ def _CUB200():
     # torch.optim.lr_scheduler.StepLR(optimzer, 10, gamma=0.94, last_epoch=-1)
     torch.optim.lr_scheduler.CosineAnnealingLR(optimzer, T_max=10)
     epochs = 200
-    batchSize = 64
+    batchSize = 32
     worker = 4
     modelConfig = {
         'model': model,
@@ -479,94 +374,6 @@ def _CUB200():
 
     train(modelConfig, dataConfig, logConfig)
 
-
-def _stanfordCars():
-    """
-       StanfordCars数据集
-       :return:
-       """
-    # 定义模型 定义评价 优化器等
-    lr = 1e-4
-    class_num = 196
-    print("cuda:2")
-    device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
-    model = Net(resnet_for_pmg.resnet50(pretrained=True), class_num)
-    device_ids = [0]
-    model = nn.DataParallel(model, device_ids=device_ids).cuda(0)
-    model.to(f'cuda:{model.device_ids[0]}')
-    criterion = torch.nn.CrossEntropyLoss()
-
-    optimzer = torch.optim.SGD([
-        {'params': model.module.pmg.features.parameters(), 'lr': lr * 1},
-        {'params': model.module.pmg.classifier_concat.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.classifier1.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.classifier2.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.classifier3.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.conv_block1.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.conv_block2.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.conv_block3.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.map1.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.map2.parameters(), 'lr': lr * 10},
-        {'params': model.module.pmg.fc.parameters(), 'lr': lr * 10},
-    ],
-        lr=lr, momentum=0.9, weight_decay=5e-4)
-
-    # torch.optim.lr_scheduler.StepLR(optimzer, 10, gamma=0.94, last_epoch=-1)
-    torch.optim.lr_scheduler.CosineAnnealingLR(optimzer, T_max=10)
-    epochs = 200
-    batchSize = 15
-    worker = 2
-    modelConfig = {
-        'model': model,
-        'criterion': criterion,
-        'optimzer': optimzer,
-        'epochs': epochs,
-        'device': device
-    }
-
-    from torchvision import transforms as T
-    # 自定义数据增强方式
-    trainTransforms = T.Compose([
-        T.Resize(550),
-        T.RandomRotation(15),
-        T.RandomCrop(448, padding=8),
-        T.RandomHorizontalFlip(),
-        T.ToTensor(),
-        T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-    ])
-
-    testTransforms = T.Compose([
-        T.Resize(550),
-        T.CenterCrop(448),
-        T.ToTensor(),
-        T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-    ])
-
-    trainLoader, testLoader, validLoader, trainLength, testLength, validLength = chooseData('STANFORDCARS', batchSize,
-                                                                                            worker, trainTransforms,
-                                                                                            testTransforms)
-
-    # 没有验证集，所以使用测试集来做验证集
-    dataConfig = {
-        'trainLoader': trainLoader,
-        'validLoader': testLoader,
-        'trainLength': trainLength,
-        'validLength': testLength
-    }
-
-    modelPath = os.path.join(os.getcwd(), 'checkpoints', '_stanfordcars.pth')
-    lastModelPath = os.path.join(os.getcwd(), 'checkpoints', '_stanfordcars_last.pth')
-    historyPath = os.path.join(os.getcwd(), 'historys', '_stanfordcars.npy')
-    logPath = os.path.join(os.getcwd(), 'logs', '_stanfordcars.txt')
-
-    logConfig = {
-        'modelPath': modelPath,
-        'historyPath': historyPath,
-        'logPath': logPath,
-        'lastModelPath': lastModelPath
-    }
-
-    train(modelConfig, dataConfig, logConfig)
 
 
 if __name__ == '__main__':
