@@ -211,7 +211,7 @@ def oneEpoch_train(model, dataLoader, optimzer, criterion, device):
         _, preds_1 = torch.max(output_1.data, 1)
         _, preds_2 = torch.max(output_2.data, 1)
         _, preds_3 = torch.max(output_3.data, 1)
-        _, preds = torch.max(output_4.data, 1)
+        _, preds_4 = torch.max(output_4.data, 1)
 
         loss += (_loss_1.item() + _loss_2.item() + _loss_3.item() + _loss_concat.item())
         loss_1 += _loss_1.item()
@@ -222,7 +222,7 @@ def oneEpoch_train(model, dataLoader, optimzer, criterion, device):
         acc_1 += torch.sum(preds_1 == labels).item()
         acc_2 += torch.sum(preds_2 == labels).item()
         acc_3 += torch.sum(preds_3 == labels).item()
-        acc_concat += torch.sum(preds == labels_2).item()
+        acc_concat += torch.sum(preds_4 == labels).item()
 
     return loss_1, loss_2, loss_3, loss_concat, loss, acc_1, acc_2, acc_3, acc_concat
 
